@@ -1,0 +1,26 @@
+{
+    "name": "IPv4 and IPv6 Packets counter probe",
+    "code": "#include <uapi\/linux\/ip.h>\r\n\r\nstruct eth_hdr {\r\n    __be64 dst : 48;\r\n    __be64 src : 48;\r\n    __be16 proto;\r\n} __attribute__((packed));\r\n\r\nBPF_ARRAY(IPV4_PACKETS_COUNTER, uint64_t,1);\r\nBPF_ARRAY(IPV6_PACKETS_COUNTER, uint64_t,1);\r\n\r\nstatic __always_inline int handle_rx(struct CTXTYPE *ctx, struct pkt_metadata *md) {\r\n\t\r\n\t\/\/Parsing L2\r\n\tvoid *data = (void *) (long) ctx->data;\r\n    \tvoid *data_end = (void *) (long) ctx->data_end;\r\n\t\r\n    \tstruct eth_hdr *ethernet = data;\r\n    \t\r\n\tif (data + sizeof(*ethernet) > data_end)\r\n       \t\treturn RX_OK;\r\n        \r\n\t\r\n\t\/\/Checking for IPv4 packets\r\n       \tif (ethernet->proto == bpf_htons(ETH_P_IP)){\r\n\t\tunsigned int key_ipv4 = 0;\r\n\t\tuint64_t * ipv4_pckts_counter = IPV4_PACKETS_COUNTER.lookup(&key_ipv4);\r\n        \tif (!ipv4_pckts_counter)\r\n            \t\tpcn_log(ctx, LOG_ERR, \"Unable to find IPV4_PACKETS_COUNTER map\");\r\n        \telse\r\n           \t\t*ipv4_pckts_counter+=1;\r\n        }   \r\n\r\n\t\/\/Checking for IPv6 packets\r\n\tif (ethernet->proto == bpf_htons(ETH_P_IPV6)){\r\n\t\tunsigned int key_ipv6 = 0;\r\n\t\tuint64_t * ipv6_pckts_counter = IPV6_PACKETS_COUNTER.lookup(&key_ipv6);\r\n        \tif (!ipv6_pckts_counter)\r\n            \t\tpcn_log(ctx, LOG_ERR, \"Unable to find IPV6_PACKETS_COUNTER map\");\r\n        \telse\r\n           \t\t*ipv6_pckts_counter+=1;\r\n        }  \t\r\n\r\n    pcn_log(ctx, LOG_TRACE, \"IPv4 packet counter: %d\", *ipv4_pkcts_counter);\r\n    pcn_log(ctx, LOG_TRACE, \"IPv6 packet counter: %d\", *ipv6_pkcts_counter);\r\n    return RX_OK;\r\n}",
+ "metrics": [
+        {
+            "name": "ipv4_packets_total",
+            "map-name": "IPV4_PACKETS_COUNTER",
+            "open-metrics-metadata": {
+                "help": "This metric represents the number of IPv4 packets that has traveled trough this probe.",
+                "type": "counter",
+                "labels": []
+            }
+        },
+	
+	{ 
+	    "name": "ipv6_packets_total",
+            "map-name": "IPV6_PACKETS_COUNTER",
+            "open-metrics-metadata": {
+                "help": "This metric represents the number of IPv6 packets that has traveled trough this probe.",
+                "type": "counter",
+                "labels": []
+            }
+	}	
+		
+    ]
+}
